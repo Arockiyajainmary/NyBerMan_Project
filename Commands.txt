@@ -1,0 +1,72 @@
+    
+#check and install updates
+sudo apt-get update 
+
+#create directories for reference genome and raw data
+mkdir <dir_name>
+
+#download reference human genome
+wget https://hgdownload.soe.ucsc.edu/goldenPath/hg38/chromosomes/chr15.fa.gz
+gunzip chr15.fa.gz
+    
+#download SRA TOOL KIT and configure it
+wget https://ftp-trace.ncbi.nlm.nih.gov/sra/sdk/current/sratoolkit.current-ubuntu64.tar.gz
+tar -xzvf sratoolkit.current-ubuntu64.tar.gz
+mv sratoolkit.3.1.0-ubuntu64 sra_toolkit
+cd sra_toolkit/bin
+./vdb-config -i #set permission and default folders, go to TOOLS > set to current directory
+cd ../../
+
+## Download raw data
+# using the three samples from bioproject PRJEB62494
+# LINK: https://www.ncbi.nlm.nih.gov/bioproject/?term=PRJEB62494
+mkdir raw_data
+cd raw_data
+../sra_toolkit/bin/fastq-dump --split-files --gzip  ERR11468775 -X 1000000
+sra_toolkit/bin/fastq-dump --split-files --gzip  ERR11468776 -X 1000000
+sra_toolkit/bin/fastq-dump --split-files --gzip  ERR11468777 -X 1000000
+
+#checking read quality using FASTQC
+sudo apt-get -y install fastqc 
+fastqc ERR11468775_* 
+fastqc ERR11468776_*
+fastqc ERR11468777_*
+
+# run fastp results for full SRA download
+wget http://opengene.org/fastp/fastp
+chmod a+x fastp
+./fastp -i ERR11468775_1.fastq.gz -o ERR11468775_trimmed_1.fastq.gz -I ERR11468775_2.fastq.gz -O ERR11468775_trimmed_2.fastq.gz --detect_adapter_for_pe -f 10 -g -l 50 -c -h ERR11468775_fastp.html -w 10
+./fastp -i ERR11468776_1.fastq.gz -o ERR11468776_trimmed_1.fastq.gz -I ERR11468776_2.fastq.gz -O ERR11468776_trimmed_2.fastq.gz --detect_adapter_for_pe -f 10 -g -l 50 -c -h ERR11468776_fastp.html -w 10
+ ./fastp -i ERR11468777_1.fastq.gz -o ERR11468777_trimmed_1.fastq.gz -I ERR11468777_2.fastq.gz -O ERR11468777_trimmed_2.fastq.gz --detect_adapter_for_pe -f 10 -g -l 50 -c -h ERR11468777_fastp.html -w 10
+
+#install BWA
+sudo apt-get install bwa
+git clone https://github.com/lh3/bwa.git
+cd bwa; make
+
+#indexing reference genome
+bwa index -a bwtsw -p chr15_ref ../files/ref_genome/chr15.fa
+bwa mem ../ref_genome/chr6_ref ../raw_data/ERR11468775_trimmed_1.fastq.gz ../raw_data/ERR11468775_trimmed_2.fastq.gz -t 10 -o sample1.sam
+
+### data conversion
+## convert sam to bam format
+# install samtools
+sudo apt-get -y install samtools
+sudo apt-get install bcftools
+samtools view -bo sample1.bam sample1.sam
+samtools view -bo sample2.bam sample2.sam
+samtools view -bo sample3.bam sample3.sam
+
+
+#repeat for all
+bwa index -a bwtsw -p chr15_ref ../files/ref_genome/chr15.fa
+bwa mem chr15_ref ../files/ERR11468775_trimmed_1.fastq.gz ../files/ERR11468775_trimmed_2.fastq.gz -t 10 -o sample1.sam
+
+
+
+
+
+
+
+  
+ 

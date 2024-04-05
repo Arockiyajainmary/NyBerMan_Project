@@ -1,0 +1,71 @@
+## using GATK
+# install GATK latest docker image
+#download reference SNP .vcf files from dbsnp
+wget https://storage.googleapis.com/genomics-public-data/resources/broad/hg38/v0/Homo_sapiens_assembly38.dbsnp138.vcf
+
+wget https://storage.googleapis.com/genomics-public-data/resources/broad/hg38/v0/Homo_sapiens_assembly38.dbsnp138.vcf.idx
+
+## run docker in interactive mode
+docker run -it -v $PWD:/data broadinstitute/gatk:latest
+
+##### data cleaning using GATK ####
+## adding read group info
+gatk AddOrReplaceReadGroups -I sample1.bam -O sample1_withRG.bam -ID 1 -LB lib1 -PL ILLUMINA -PU unit1 -SM sample1
+
+# sorting reads
+gatk SortSam -I sample1_withRG.bam -O sorted_sample1.bam -SO coordinate
+
+# overview of the mapping results
+samtools flagstat sorted_sample1.bam
+
+# marking duplicates
+gatk MarkDuplicates -I sorted_sample1.bam -O markedDups.bam -M metrics_duplicates
+
+#BQSR
+gatk CreateSequenceDictionary -R chr15.fa
+samtools faidx chr15.fa
+
+# running BQSR
+gatk BaseRecalibrator -I sample1_markedDups.bam -R chr15.fa --known-sites Homo_sapiens_assembly38.dbsnp138.vcf -O sample1_recal_data.table
+gatk BaseRecalibrator -I sample2_markedDups.bam -R chr15.fa --known-sites Homo_sapiens_assembly38.dbsnp138.vcf -O sample2_recal_data.table
+gatk BaseRecalibrator -I sample3_markedDups.bam -R chr15.fa --known-sites Homo_sapiens_assembly38.dbsnp138.vcf -O sample3_recal_data.table
+
+ 
+gatk ApplyBQSR -R chr15.fa -I sample2_markedDups.bam --bqsr-recal-file sample2_recal_data.table -O sample2_recal.bam
+gatk ApplyBQSR -R chr15.fa -I sample2_markedDups.bam --bqsr-recal-file sample2_recal_data.table -O sample2_recal.bam
+gatk ApplyBQSR -R chr15.fa -I sample3_markedDups.bam --bqsr-recal-file sample3_recal_data.table -O sample3_recal.bam
+
+samtools index sample1_recal.bam
+samtools index sample2_recal.bam
+samtools index sample3_recal.bam
+
+gatk Mutect2 -I sample1_recal.bam -R chr15.fa -O sample1.vcf.gz
+gatk Mutect2 -I sample2_recal.bam -R chr15.fa -O sample2.vcf.gz
+gatk Mutect2 -I sample3_recal.bam -R chr15.fa -O sample3.vcf.gz
+
+gatk FilterMutectCalls -R chr15.fa -V sample1.vcf.gz -O filtered_sample1.vcf.gz
+gatk FilterMutectCalls -R chr15.fa -V sample2.vcf.gz -O filtered_sample2.vcf.gz
+gatk FilterMutectCalls -R chr15.fa -V sample3.vcf.gz -O filtered_sample3.vcf.gz
+
+bcftools view --types indels sample1.vcf.gz >> sample1_indels.vcf
+bcftools view --types indels sample2.vcf.gz >> sample2_indels.vcf
+bcftools view --types indels sample3.vcf.gz >> sample3_indels.vcf
+
+bcftools view --types snps sample1.vcf.gz >> sample1_snps.vcf
+bcftools view --types snps sample2.vcf.gz >> sample2_snps.vcf
+bcftools view --types snps sample3.vcf.gz >> sample3_snps.vcf
+
+# filtering VCF file 
+bcftools filter -i '%QUAL>50' sample1.vcf.gz
+bcftools filter -i '%QUAL>50' sample2.vcf.gz  
+bcftools filter -i '%QUAL>50' sample3.vcf.gz 
+
+gatk HaplotypeCaller -R chr15.fa -I sample1_recal.bam -O sample1_germline.g.vcf.gz -ERC GVCF
+gatk HaplotypeCaller -R chr15.fa -I sample2_recal.bam -O sample2_germline.g.vcf.gz -ERC GVCF
+gatk HaplotypeCaller -R chr15.fa -I sample3_recal.bam -O sample3_germline.g.vcf.gz -ERC GVCF
+
+gatk GenomicsDBImport -V sample1_germline.g.vcf.gz -V sample2_germline.g.vcf.gz -V sample3_germline.g.vcf.gz --genomicsdb-workspace-path test_db --intervals chr15
+
+gatk GenotypeGVCFs -R chr15.fa -V gendb://test_db -O chr15_new.vcf.gz
+
+
