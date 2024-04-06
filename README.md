@@ -5,7 +5,7 @@ This project was accomplished for the assessment in a 15-day internship conducte
 
 We were provided with intensive training on NGS/WGS on the human genome for variant analysis. Then, we were assigned the task to identify and characterize the genetic variants, SNPs, indels and structural variants of WGS of the human genome (chromosome15) for tongue cancer patient samples using gatk pipeline.
 
-The genomic data analysis was done by Zainuldin and the interpretation of the results was done by Arockiyajainmary (www.linkedin.com/in/arockiyajainmary-m-2b3743166).
+The genomic data analysis was done by Md Zainul Ali (https://www.linkedin.com/in/mdzainulali) and the interpretation of the results was done by Arockiyajainmary (www.linkedin.com/in/arockiyajainmary-m-2b3743166).
 
 BioProject- PRJEB62494
 Reference human genome: Hg38/chromosome 15
